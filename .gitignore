@@ -1,0 +1,10 @@
+Debug
+.vs
+*.exe
+*.txt
+*~
+cpe.db
+build
+\#*#
+
+
