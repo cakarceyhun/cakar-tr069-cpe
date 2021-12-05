@@ -4,8 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "external/sqlite-3.36.0/sqlite3.h"
+
+#define DATABASE_FILE "/tmp/cpe.db"
 
 void exec(sqlite3* db, const char* sql)
 {
@@ -21,34 +24,16 @@ void exec(sqlite3* db, const char* sql)
     sqlite3_finalize(stmt);
 }
 
-/*
-void exec2(sqlite3* db, const char* sql)
-{
-    sqlite3_stmt* stmt;
-    if (sqlite3_prepare(db, sql, strlen(sql), &stmt, NULL) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            const unsigned char* value = sqlite3_column_text(stmt, 0);
-            printf("%s\n", value);
-        }
-    } else {
-        printf("%s\n", sqlite3_errmsg(db));
-    }
-    sqlite3_finalize(stmt);
-}
-*/
 
 void create_database()
 {
-    FILE *f;
     sqlite3* db;
 
-    f = fopen("./cpe.db", "rb");
-    if (!f) {
+    if(access(DATABASE_FILE, F_OK ) == 0 ) {
 	return;
     }
-    fclose(f);
-    
-    if (sqlite3_open("./cpe.db", &db) != SQLITE_OK) {
+   
+    if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(db));
 	return;
     }
@@ -77,7 +62,7 @@ void get_parameter_values_string(const char *path, char *output, size_t max_leng
     sqlite3_stmt* stmt;
     sqlite3* db;
     
-    if (sqlite3_open("./cpe.db", &db) != SQLITE_OK) {
+    if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(db));
 	return;
     }
@@ -120,7 +105,7 @@ int get_forced_parameter_values_length(void)
     sqlite3_stmt* stmt;
     sqlite3* db;
     
-    if (sqlite3_open("./cpe.db", &db) != SQLITE_OK) {
+    if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(db));
 	return -1;
     }
@@ -159,7 +144,7 @@ void* get_forced_parameter_values_start(void)
     struct parameter_handler* handler = malloc(sizeof(struct parameter_handler)); 
     char *query;
     
-    if (sqlite3_open("./cpe.db", &handler->db) != SQLITE_OK) {
+    if (sqlite3_open(DATABASE_FILE, &handler->db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(handler->db));
 
 	free(handler);

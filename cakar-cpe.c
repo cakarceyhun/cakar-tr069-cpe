@@ -27,7 +27,7 @@ int main(int argc, char** argv)
     char host[1024] = "";
     int iResult;
 
-    //create_database();
+    create_database();
 
     sendbuf[0] = '\0';
     append_xml(sendbuf, MAXIMUM_BUFFER_LENGTH);
@@ -59,17 +59,22 @@ int main(int argc, char** argv)
         }
     } while (iResult > 0);
 
-    char* xml_buffer = malloc(parser.content_length + 1);
+    char* xml_buffer = calloc(1, parser.content_length + 2);
     if (!xml_buffer) {
         printf("memory allocation error\n");
         SHOULD_NOT_BE_HERE
         return -1;
     }
 
+
     iResult = connection_receive(&connection, xml_buffer, (int)parser.content_length);
     if (iResult == 0) {
         printf("Connection closed\n");
     }
+
+    xml_buffer[parser.content_length] = '\n';
+
+    printf("%s", xml_buffer);
 
     append_http_header(httpheader, 0, host, parser.session_id, 1024);
     connection_send(&connection, httpheader, (int)strlen(httpheader));

@@ -81,6 +81,4 @@ void append_xml(char* sendbuf, size_t maximum_size)
     strcat(sendbuf, "</cwmp:Inform>\r\n");
     strcat(sendbuf, "</soap-env:Body>\r\n");
     strcat(sendbuf, "</soap-env:Envelope>\r\n");
-
-    printf("%s\n", sendbuf);
 }
