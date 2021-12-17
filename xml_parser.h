@@ -9,7 +9,6 @@ enum XmlParserState
 {
     XML_STATE_VALID,
     XML_STATE_INVALID,
-    XML_STATE_COMPLETED
 };
 
 void *parse_xml_init(void);

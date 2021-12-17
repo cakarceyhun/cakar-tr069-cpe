@@ -53,11 +53,12 @@ void* parse_xml_init(void)
     parser->state = OUTSIDE_OF_TAG;
     parser->results.first = NULL;
     parser->results.end = NULL;
+
+    return (void *) parser;
 }
 
 int parse_xml_register(void* parser_vp, const char *path)
 {
-    int last_id = 0;
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
 
     struct XmlParserResult *item = calloc(1, sizeof(struct XmlParserResult));
@@ -190,12 +191,10 @@ enum XmlParserState parse_xml_push(void* parser_vp, char v)
 
 	    parse_xml_execute(parser_vp, parser->line, parser->value);
 	    //printf("%s=%s\n", parser->line, parser->value);
-	    size_t line_length = strlen(parser->line);
-	    size_t remove_length = strlen(parser->untag_line);
 	    size_t start = strlen(parser->line) - strlen(parser->untag_line);
 	    const char* last = &parser->line[start];
 	    if (strcmp(parser->untag_line, last) != 0) {
-		return 1;
+		return XML_STATE_INVALID;
 	    }
 	    parser->line[start - 1] = '\0';
 	    parser->length = start - 1;
@@ -207,6 +206,8 @@ enum XmlParserState parse_xml_push(void* parser_vp, char v)
 	    parser->previous = '\0';
 	}
     }
+
+    return XML_STATE_VALID;
 }
 
 void parse_xml_close(void* parser_vp)

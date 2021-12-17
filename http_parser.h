@@ -16,7 +16,7 @@ struct HttpParser
     int response;
 
     char line[1024];
-    char position;
+    int position;
     char session_id[1024];
 };
 

@@ -50,8 +50,6 @@ void append_xml(char* sendbuf, size_t maximum_size)
     strcat(sendbuf, "\t\t</Event>\r\n");
     strcat(sendbuf, "\t\t<MaxEnvelopes>1</MaxEnvelopes>\r\n");
 
-    size_t check_length = strlen(sendbuf);
-
     strcat(sendbuf, "\t\t<CurrentTime>");
     strcat(sendbuf, time_str);
     strcat(sendbuf, "</CurrentTime>\r\n");

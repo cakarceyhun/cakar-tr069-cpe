@@ -83,7 +83,7 @@ void get_parameter_values_string(const char *path, char *output, size_t max_leng
     }
 
     const unsigned char* value = sqlite3_column_text(stmt, 0);
-    size_t length = strlen(value);
+    size_t length = strlen((char *)value);
     
     if (length >= max_length) {
 	sqlite3_finalize(stmt);
@@ -176,8 +176,8 @@ bool get_forced_parameter_values_next(void *handler_vp, const char** path, const
 	return false;
     }
 
-    *path = sqlite3_column_text(handler->stmt, 0);
-    *value = sqlite3_column_text(handler->stmt, 0);
+    *path = (const char *) sqlite3_column_text(handler->stmt, 0);
+    *value = (const char *) sqlite3_column_text(handler->stmt, 0);
 
     return true;
 }

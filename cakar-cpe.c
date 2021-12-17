@@ -29,7 +29,6 @@ enum Mode
 int main(int argc, char** argv)
 {
     struct connection_s connection;
-    struct addrinfo* result = NULL, *ptr = NULL;
     char sendbuf[MAXIMUM_BUFFER_LENGTH] = "";
     char httpheader[1024] = "";
     char host[1024] = "";
@@ -116,7 +115,7 @@ int main(int argc, char** argv)
 	    }
 
 	    xml_state = parse_xml_push(&xml_parser, value[0]);
-	    if (xml_state == XML_STATE_INVALID || xml_state == XML_STATE_COMPLETED) {
+	    if (xml_state == XML_STATE_INVALID) {
 		break;
 	    }
 	}
