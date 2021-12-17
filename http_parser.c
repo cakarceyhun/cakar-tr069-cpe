@@ -22,7 +22,7 @@ enum HttpParserState parse_http_push(struct HttpParser* parser, char value)
 {
     if (parser->position == 1023) {
         SHOULD_NOT_BE_HERE
-            return STATE_INVALID;
+        return STATE_INVALID;
     }
 
     parser->line[parser->position++] = value;
@@ -57,4 +57,13 @@ enum HttpParserState parse_http_push(struct HttpParser* parser, char value)
     }
 
     return STATE_VALID;
+}
+
+int parse_http_get_response(struct HttpParser* parser)
+{
+    return parser ? parser->response : -1;
+}
+
+void parse_http_close(struct HttpParser* parser)
+{
 }

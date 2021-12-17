@@ -22,6 +22,8 @@ struct HttpParser
 
 void parse_http_init(struct HttpParser* parser);
 enum HttpParserState parse_http_push(struct HttpParser* parser, char value);
+int parse_http_get_response(struct HttpParser* parser);
+void parse_http_close(struct HttpParser* parser);
 
 #endif
 
