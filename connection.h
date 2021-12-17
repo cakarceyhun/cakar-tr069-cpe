@@ -6,7 +6,7 @@ struct connection_s
 	int sock;
 };
 
-int connection_init(struct connection_s* connection, char* ip, char* port);
+int connection_init(struct connection_s* connection, char* ip, int port);
 
 int connection_send(struct connection_s* connection, char* buffer, int length);
 

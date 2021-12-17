@@ -12,11 +12,12 @@
 
 #include "connection.h"
 #include "datamodel.h"
+#include "common.h"
 
 #define SHOULD_NOT_BE_HERE assert(0);
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "7547"
+#define DEFAULT_PORT 7547
 #define MAXIMUM_BUFFER_LENGTH (10 * 1024)
 
 enum Mode
@@ -33,17 +34,30 @@ int main(int argc, char** argv)
     char httpheader[1024] = "";
     char host[1024] = "";
     int iResult;
-    size_t i, j;
+    size_t j;
     enum Mode mode = MODE_INFORM_INIT;
     struct HttpParser parser;
+    int port = -1;
 
     create_database();
 
     get_parameter_values_string("Device.ManagementServer.URL", host, sizeof(host) - 1);
-    connection_init(&connection, "127.0.0.1", DEFAULT_PORT);
+    char *start = strstr(host, "/");
+    if (!start) {
+	assert(0);
+    }
+    start += 2;
+    char *end = strchr(start, ':');
+    if (end) {
+	end[0] = '\0';
+	port = extract_string(end + 1, strlen(end + 1));
+    } else {
+	port = DEFAULT_PORT;
+    }
     
+    connection_init(&connection, start, port);
 
-    for (i = 0; i < 3; i++) {
+    while (1) {
 	enum HttpParserState state = STATE_VALID;
 	
 	sendbuf[0] = '\0';

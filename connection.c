@@ -12,7 +12,7 @@
 
 #define PORT 7547
 
-int connection_init(struct connection_s* connection, char* ip, char* port)
+int connection_init(struct connection_s* connection, char* ip, int port)
 {
     struct sockaddr_in serv_addr;
     if ((connection->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
