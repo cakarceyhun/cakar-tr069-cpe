@@ -28,11 +28,11 @@ struct XmlParserResults
 
 struct XmlParser
 {
-    char *line;
+    char line[4000];
     size_t length;
-    char *untag_line;
+    char untag_line[4000];
     size_t untag_length;
-    char *value;
+    char value[4000];
     size_t value_length;
     char previous;
     enum state_e state;
@@ -43,11 +43,11 @@ void* parse_xml_init(void)
 {
     struct XmlParser *parser = malloc(sizeof(struct XmlParser));
     
-    parser->line = malloc(4000);
+    parser->line[0] = '\0';
     parser->length = 0;
-    parser->untag_line = malloc(4000);
+    parser->untag_line[0] = '\0';
     parser->untag_length = 0;
-    parser->value = malloc(4000);
+    parser->value[0] = '\0';
     parser->value_length = 0;
     parser->previous = '\0';
     parser->state = OUTSIDE_OF_TAG;
@@ -78,7 +78,7 @@ int parse_xml_register(void* parser_vp, const char *path)
 	item->id = parser->results.end->id + 1;
 
 	parser->results.end->next = item;
-	parser->results.end->next = parser->results.end;
+	parser->results.end = parser->results.end->next;
     }
 
     return item->id; 
@@ -105,14 +105,14 @@ bool parse_xml_result_exists(void* parser_vp, int id)
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
     struct XmlParserResult *item = parser->results.first;
     
-    for (i = 0; item; i++) {
+    for (i = 0; i != id && item; i++) {
 	item = item->next;
     }
 
     if (item) {
-	return i;
+	return true;
     } else {
-	return -1;
+	return false;
     }
 }
 
@@ -215,10 +215,6 @@ void parse_xml_close(void* parser_vp)
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
 
     if (parser) {
-	free(parser->line);
-	free(parser->untag_line);
-	free(parser->value);
-
 	struct XmlParserResult *item = parser->results.first;
 	while (item) {
 	    struct XmlParserResult *next = item->next;
@@ -229,6 +225,8 @@ void parse_xml_close(void* parser_vp)
 	    free(item);
 	    item = next;
 	}
+
+	free(parser);
 
 	*((struct XmlParser**) parser_vp) = NULL;
     }
