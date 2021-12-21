@@ -12,12 +12,13 @@ add_executable(cakar-tr069-cpe
   datamodel.c
   http_generator.c
   http_parser.c
-  xml_inform_generator.c
+  xml_generator.c
   connection.c
   external/sqlite-3.36.0/sqlite3.c
   xml_parser.c
   inform.c
   inform_queue.c
+  http_connection_request.c
   )
 
 TARGET_LINK_LIBRARIES(cakar-tr069-cpe pthread dl)

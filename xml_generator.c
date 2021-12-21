@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void append_xml(char* sendbuf, const char *type)
+void xml_generator_create(char* sendbuf, const char *type)
 {
     time_t now = time(NULL);
     struct tm *now_tm;

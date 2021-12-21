@@ -4,7 +4,7 @@
 #include "inform.h"
 
 #include "http_generator.h"
-#include "xml_inform_generator.h"
+#include "xml_generator.h"
 #include "http_parser.h"
 #include "xml_parser.h"
 
@@ -62,7 +62,7 @@ void inform(enum inform_type_e type)
 		(type == INFORM_TYPE_VALUE_CHANGE) ? "4 VALUE CHANGE" :
 		(type == INFORM_TYPE_CONNECTION_REQUEST) ? "6 CONNECTION REQUEST" : "";
 	  
-	    append_xml(sendbuf, inform_type_text);
+	    xml_generator_create(sendbuf, inform_type_text);
 	    append_http_header(httpheader, strlen(sendbuf), host, NULL, 1024);
 	} else if (mode == MODE_EMPTY) {
 	    append_http_header(httpheader, 0, host, parser.session_id, 1024);

@@ -1,0 +1,6 @@
+#ifndef HTTP_CONNECTION_REQUEST_H_CEYHUNCAKAR_2021_12_21
+#define HTTP_CONNECTION_REQUEST_H_CEYHUNCAKAR_2021_12_21
+
+void* http_connection_request_thread_main(void* queue);
+
+#endif
