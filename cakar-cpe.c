@@ -1,133 +1,97 @@
-#include <stdlib.h>
+#include "datamodel.h"
+#include "inform_queue.h"
+#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <errno.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
-#include <assert.h>
-#include "datamodel.h"
 
-#include "http_generator.h"
-#include "xml_inform_generator.h"
-#include "http_parser.h"
-#include "xml_parser.h"
 
-#include "connection.h"
-#include "datamodel.h"
-#include "common.h"
-
-#define SHOULD_NOT_BE_HERE assert(0);
-
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT 7547
-#define MAXIMUM_BUFFER_LENGTH (10 * 1024)
-
-enum Mode
+void* http_connection_request_thread_main(void* queue)
 {
-    MODE_INFORM_INIT,
-    MODE_EMPTY,
-};
+    int listenfd = 0, connfd = 0;
+    struct sockaddr_in serv_addr; 
+
+    char buffer[256];
+    int ret = 0;
+
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&serv_addr, '0', sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(8080); 
+
+    ret = bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)); 
+
+    ret = listen(listenfd, 10); 
+
+    while(1)
+    {
+        connfd = accept(listenfd, (struct sockaddr*)NULL, NULL); 
+
+	ret = read(connfd, buffer, 255);
+	time_t now = time(NULL);
+	struct tm *now_tm;
+	static const char *week_days[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}; 
+	static const char *months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Agu", "Sep", "Oct", "Nov", "Dec"};
+					 
+	now_tm = gmtime(&now);
+	snprintf(buffer, 128, "HTTP/1.1 200 OK\r\nDate: %s, %02d %s %d %02d:%02d:%02d GMT\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n",
+		 week_days[now_tm->tm_wday], now_tm->tm_mday, months[now_tm->tm_mon], now_tm->tm_year + 1900, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
+	write(connfd, buffer, strlen(buffer));
+
+	inform_queue_send(&queue, INFORM_TYPE_CONNECTION_REQUEST);
+	
+        close(connfd);
+        sleep(1);
+     }
+
+    printf("ret=%d\n", ret);
+    pthread_exit(NULL);
+}
 
 int main(int argc, char** argv)
 {
-    struct connection_s connection;
-    char sendbuf[MAXIMUM_BUFFER_LENGTH] = "";
-    char httpheader[1024] = "";
-    char host[1024] = "";
-    int iResult;
-    size_t j;
-    enum Mode mode = MODE_INFORM_INIT;
-    struct HttpParser parser;
-    int port = -1;
-
+    pthread_t inform_thread;
+    pthread_t connection_request_thread;
+    void *ret;
+  
     create_database();
 
-    get_parameter_values_string("Device.ManagementServer.URL", host, sizeof(host) - 1);
-    char *start = strstr(host, "/");
-    if (!start) {
-	assert(0);
+    void *queue = inform_queue_create();
+
+    if (pthread_create(&inform_thread, NULL, inform_thread_main, queue) != 0) {
+	perror("pthread_create error");
+	exit(1);
     }
-    start += 2;
-    char *end = strchr(start, ':');
-    if (end) {
-	end[0] = '\0';
-	port = extract_string(end + 1, strlen(end + 1));
-    } else {
-	port = DEFAULT_PORT;
+
+    if (pthread_create(&connection_request_thread, NULL, http_connection_request_thread_main, queue) != 0) {
+	perror("pthread_create error");
+	exit(1);
     }
+
+    inform_queue_send(&queue, INFORM_TYPE_BOOTSTRAP);
+
+    if (pthread_join(inform_thread, &ret) != 0) {
+	perror("pthread_join error");
+	exit(3);
+    }
+
+    if (pthread_join(connection_request_thread, &ret) != 0) {
+	perror("pthread_join error");
+	exit(3);
+    }
+
+    inform_queue_destroy(&queue);
     
-    connection_init(&connection, start, port);
-
-    while (1) {
-	enum HttpParserState state = STATE_VALID;
-	
-	sendbuf[0] = '\0';
-
-	if (mode == MODE_INFORM_INIT) {
-	    append_xml(sendbuf, MAXIMUM_BUFFER_LENGTH);
-	    append_http_header(httpheader, strlen(sendbuf), host, NULL, 1024);
-	} else if (mode == MODE_EMPTY) {
-	    append_http_header(httpheader, 0, host, parser.session_id, 1024);
-	} else {
-	    assert(0);
-	}
-
-	parse_http_init(&parser);
-
-	connection_send(&connection, httpheader, (int)strlen(httpheader));
-	if (strlen(sendbuf)) {
-	    connection_send(&connection, sendbuf, (int)strlen(sendbuf));
-	}
-
-	do {
-	    char value[1];
-
-	    iResult = connection_receive(&connection, value, 1);
-	    if (iResult == 0) {
-		printf("Connection closed\n");
-		break;
-	    }
-
-	    state = parse_http_push(&parser, value[0]);
-	    if (state == STATE_INVALID || state == STATE_COMPLETED) {
-		break;
-	    }
-	} while (iResult > 0);
-
-	if (state != STATE_COMPLETED) {
-	    break;
-	}
-
-	int response = parse_http_get_response(&parser);
-	parse_http_close(&parser);
-	if (response != 200) {
-	    break;
-	}
-
-	enum XmlParserState xml_state = XML_STATE_VALID;
-	void* xml_parser = parse_xml_init();
-	int inform_response_id = parse_xml_register(&xml_parser, "/soap-env:Envelope/soap-env:Body/cwmp:InformResponse");
-	for (j = 0; j < parser.content_length; ++j) {
-	    char value[1];
-
-	    iResult = connection_receive(&connection, value, 1);
-	    if (iResult == 0) {
-		printf("Connection closed\n");
-		break;
-	    }
-
-	    xml_state = parse_xml_push(&xml_parser, value[0]);
-	    if (xml_state == XML_STATE_INVALID) {
-		break;
-	    }
-	}
-
-	if (parse_xml_result_exists(&xml_parser, inform_response_id)) {
-	    mode = MODE_EMPTY;
-	}
-
-	parse_xml_close(&xml_parser);
-    }
-
-    connection_close(&connection);
-
     return 0;
 }

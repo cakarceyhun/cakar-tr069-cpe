@@ -1,0 +1,16 @@
+#ifndef INFORM_H_CEYHUNCAKAR_2021_12_18
+#define INFORM_H_CEYHUNCAKAR_2021_12_18
+
+enum inform_type_e
+{
+    INFORM_TYPE_BOOTSTRAP,
+    INFORM_TYPE_BOOT,
+    INFORM_TYPE_PERIODIC,
+    INFORM_TYPE_VALUE_CHANGE,
+    INFORM_TYPE_CONNECTION_REQUEST
+};
+
+void inform(enum inform_type_e type);
+
+#endif
+

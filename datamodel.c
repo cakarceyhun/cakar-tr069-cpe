@@ -177,7 +177,7 @@ bool get_forced_parameter_values_next(void *handler_vp, const char** path, const
     }
 
     *path = (const char *) sqlite3_column_text(handler->stmt, 0);
-    *value = (const char *) sqlite3_column_text(handler->stmt, 0);
+    *value = (const char *) sqlite3_column_text(handler->stmt, 1);
 
     return true;
 }

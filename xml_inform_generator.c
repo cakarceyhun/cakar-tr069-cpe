@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void append_xml(char* sendbuf, size_t maximum_size)
+void append_xml(char* sendbuf, const char *type)
 {
     time_t now = time(NULL);
     struct tm *now_tm;
@@ -29,7 +29,7 @@ void append_xml(char* sendbuf, size_t maximum_size)
     strcat(sendbuf, "</Manufacturer>\r\n");
 
     strcat(sendbuf, "\t\t\t<OUI>");
-    get_parameter_values_string("Device.DeviceInfo.OUI", &sendbuf[strlen(sendbuf)], maximum_size);
+    get_parameter_values_string("Device.DeviceInfo.OUI", &sendbuf[strlen(sendbuf)], 1024);
     strcat(sendbuf, "</OUI>\r\n");
 
     strcat(sendbuf, "\t\t\t<ProductClass>");
@@ -44,7 +44,11 @@ void append_xml(char* sendbuf, size_t maximum_size)
 
     strcat(sendbuf, "\t\t<Event soap-enc:arrayType=\"cwmp:EventStruct[1]\">\r\n");
     strcat(sendbuf, "\t\t\t<EventStruct>\r\n");
-    strcat(sendbuf, "\t\t\t\t<EventCode>2 PERIODIC</EventCode>\r\n");
+
+    strcat(sendbuf, "\t\t\t\t<EventCode>");
+    strcat(sendbuf, type);
+    strcat(sendbuf, "</EventCode>\r\n");
+
     strcat(sendbuf, "\t\t\t\t<CommandKey/>\r\n");
     strcat(sendbuf, "\t\t\t</EventStruct>\r\n");
     strcat(sendbuf, "\t\t</Event>\r\n");
