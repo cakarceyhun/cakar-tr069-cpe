@@ -3,6 +3,6 @@
 
 #include <stdlib.h>
 
-void append_http_header(char* sendbuf, size_t length, char* host, char* session_id, size_t maximum_size);
+void append_http_header(char* sendbuf, size_t length, const char* host, char* session_id, size_t maximum_size);
 
 #endif

@@ -3,11 +3,12 @@
 
 enum inform_type_e
 {
+    INFORM_TYPE_NONE,
     INFORM_TYPE_BOOTSTRAP,
     INFORM_TYPE_BOOT,
     INFORM_TYPE_PERIODIC,
     INFORM_TYPE_VALUE_CHANGE,
-    INFORM_TYPE_CONNECTION_REQUEST
+    INFORM_TYPE_CONNECTION_REQUEST,
 };
 
 void inform(enum inform_type_e type);

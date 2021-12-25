@@ -1,5 +1,5 @@
 #include "datamodel.h"
-
+#include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +9,8 @@
 #include "external/sqlite-3.36.0/sqlite3.h"
 
 #define DATABASE_FILE "/tmp/cpe.db"
+
+pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void exec(sqlite3* db, const char* sql)
 {
@@ -54,49 +56,107 @@ void create_database()
     sqlite3_close(db);
 }
 
-void get_parameter_values_string(const char *path, char *output, size_t max_length)
+struct sqlite3_handler_s
 {
-    (void) output;
-    (void) max_length;
-    char query[1024];
-    sqlite3_stmt* stmt;
+    sqlite3_stmt *stmt;
     sqlite3* db;
-    
-    if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK) {
-        printf("%s\n", sqlite3_errmsg(db));
-	return;
+    struct sqlite3_handler_s *next;
+};
+
+struct gpv_handler_s
+{
+    struct sqlite3_handler_s *first;
+    struct sqlite3_handler_s *last;
+};
+
+const char *get_parameter_values_string(void **handler_pv, const char *path)
+{
+    char query[1024];
+    struct gpv_handler_s *handler;
+    const char *result;
+
+    pthread_mutex_lock(&db_lock);
+
+    if (*handler_pv == NULL) {
+        *((struct gpv_handler_s**) handler_pv) = calloc(1, sizeof(struct gpv_handler_s));
+    }
+
+    handler = *((struct gpv_handler_s**) handler_pv);
+    if (!handler) {
+        printf("memory allocation error\n");
+
+        return NULL;
+    }
+
+    if (!handler->last) {
+        handler->last = calloc(1, sizeof(struct sqlite3_handler_s));
+        if (!handler->last) {
+            printf("memory allocation error\n");
+
+            return NULL;
+        }
+
+        handler->first = handler->last;
+    } else {
+        handler->last->next = calloc(1, sizeof(struct sqlite3_handler_s));
+        if (!handler->last->next) {
+            printf("memory allocation error\n");
+
+            return NULL;
+        }
+        handler->last = handler->last->next;
+    }
+
+    if (!handler->last->db) {
+        if (sqlite3_open(DATABASE_FILE, &handler->last->db) != SQLITE_OK) {
+            printf("%s\n", sqlite3_errmsg(handler->last->db));
+            close_get_parameter_values(handler_pv);
+
+            return NULL;
+        }
     }
 
     snprintf(query, 1024, "SELECT [value] FROM [paths] where [path]='%s'", path);
-    if (sqlite3_prepare(db, query, strlen(query), &stmt, NULL) != SQLITE_OK) {
-        printf("%s\n", sqlite3_errmsg(db));
-	sqlite3_close(db);
+    if (sqlite3_prepare(handler->last->db, query, strlen(query), &handler->last->stmt, NULL) != SQLITE_OK) {
+        printf("%s\n", sqlite3_errmsg(handler->last->db));
+        close_get_parameter_values(handler_pv);
 
-	return;
+        return NULL;
     }
 
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-	sqlite3_finalize(stmt);
-	sqlite3_close(db);
+    if (sqlite3_step(handler->last->stmt) != SQLITE_ROW) {
+        close_get_parameter_values(handler_pv);
 
-	return;
+        return NULL;
     }
 
-    const unsigned char* value = sqlite3_column_text(stmt, 0);
-    size_t length = strlen((char *)value);
-    
-    if (length >= max_length) {
-	sqlite3_finalize(stmt);
-	sqlite3_close(db);
+    result = (const char *) sqlite3_column_text(handler->last->stmt, 0);
 
-	return;
+    pthread_mutex_unlock(&db_lock);
+
+    return result;
+}
+
+void close_get_parameter_values(void **handler_pv)
+{
+    struct gpv_handler_s *handler = *((struct gpv_handler_s**) handler_pv);
+
+    pthread_mutex_lock(&db_lock);
+    if (handler) {
+        struct sqlite3_handler_s *sqlite3_handler = (struct sqlite3_handler_s *) handler->first;
+        while(sqlite3_handler) {
+            struct sqlite3_handler_s *next = (struct sqlite3_handler_s *) sqlite3_handler->next;
+
+            sqlite3_finalize(sqlite3_handler->stmt);
+            sqlite3_close(sqlite3_handler->db);
+            free(sqlite3_handler);
+            sqlite3_handler = next;
+        }
+        free(handler);
+
+        *((struct sqlite_handler_s**) handler_pv) = NULL;
     }
-
-    memcpy(output, value, length);
-    output[length] = '\0';
-
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);  
+    pthread_mutex_unlock(&db_lock);
 }
 
 int get_forced_parameter_values_length(void)
@@ -104,31 +164,35 @@ int get_forced_parameter_values_length(void)
     char *query;
     sqlite3_stmt* stmt;
     sqlite3* db;
+
+    pthread_mutex_lock(&db_lock);
     
     if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(db));
-	return -1;
+        return -1;
     }
 
     query = "SELECT count([path]) FROM [paths] where [is_forced]=1";
     if (sqlite3_prepare(db, query, strlen(query), &stmt, NULL) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(db));
-	sqlite3_close(db);
+        sqlite3_close(db);
 
-	return -1;
+        return -1;
     }
 
     if (sqlite3_step(stmt) != SQLITE_ROW) {
-	sqlite3_finalize(stmt);
-	sqlite3_close(db);
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
 
-	return -1;
+        return -1;
     }
 
     int value = sqlite3_column_int(stmt, 0);
     
     sqlite3_finalize(stmt);
     sqlite3_close(db);  
+
+    pthread_mutex_unlock(&db_lock);
 
     return value;
 }
@@ -141,56 +205,77 @@ struct parameter_handler
 
 void* get_forced_parameter_values_start(void)
 {
-    struct parameter_handler* handler = malloc(sizeof(struct parameter_handler)); 
+    struct parameter_handler* handler = calloc(1, sizeof(struct parameter_handler));
     char *query;
+
+    pthread_mutex_lock(&db_lock);
     
     if (sqlite3_open(DATABASE_FILE, &handler->db) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(handler->db));
 
-	free(handler);
-	handler = NULL;
-	return NULL;
+        free(handler);
+        handler = NULL;
+
+        goto fail;
     }
 
     query = "SELECT [path],[value] FROM [paths] where [is_forced]=1";
     if (sqlite3_prepare(handler->db, query, strlen(query), &handler->stmt, NULL) != SQLITE_OK) {
         printf("%s\n", sqlite3_errmsg(handler->db));
 
-	sqlite3_close(handler->db);
-	free(handler);
-	handler = NULL;
-	
-	return NULL;
+        goto fail;
     }
+
+    goto success;
+
+fail:
+    if (handler) {
+        if (handler->db) {
+            sqlite3_close(handler->db);
+        }
+        free(handler);
+        handler = NULL;
+    }
+
+success:
+    pthread_mutex_unlock(&db_lock);
 
     return (void *) handler;
 }
 
 bool get_forced_parameter_values_next(void *handler_vp, const char** path, const char** value)
 {
+    bool ret = true;
     struct parameter_handler* handler = *((struct parameter_handler**) handler_vp);
+
+    pthread_mutex_lock(&db_lock);
     
     if (sqlite3_step(handler->stmt) != SQLITE_ROW) {
-	get_forced_parameter_values_end(handler_vp);
+        get_forced_parameter_values_end(handler_vp);
 
-	return false;
+        ret = false;
+        goto end;
     }
 
     *path = (const char *) sqlite3_column_text(handler->stmt, 0);
     *value = (const char *) sqlite3_column_text(handler->stmt, 1);
 
-    return true;
+    pthread_mutex_unlock(&db_lock);
+
+    return ret;
 }
 
 void get_forced_parameter_values_end(void *handler_vp)
 {
     struct parameter_handler* handler = *((struct parameter_handler**) handler_vp);
-    
-    if (handler) {
-	sqlite3_finalize(handler->stmt);
-	sqlite3_close(handler->db);
 
-	free(handler);
-	*((struct parameter_handler**) handler_vp) = NULL;
+    pthread_mutex_lock(&db_lock);
+    if (handler) {
+        sqlite3_finalize(handler->stmt);
+        sqlite3_close(handler->db);
+
+        free(handler);
+        *((struct parameter_handler**) handler_vp) = NULL;
     }
+    pthread_mutex_unlock(&db_lock);
 }

@@ -1,5 +1,5 @@
+#include "active.h"
 #include "inform_queue.h"
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -94,13 +94,21 @@ enum inform_type_e inform_queue_receive(void **queue_vp)
 }
 
 
-void* inform_thread_main(void* queue)
+void* inform_thread_main(void* arg_pv)
 {
+    struct arg_s *arg = (struct arg_s*) arg_pv;
 
     while (1) {
-	enum inform_type_e type = inform_queue_receive(&queue);
+        enum inform_type_e type = inform_queue_receive(&arg->queue);
 
-	inform(type);
+        pthread_mutex_lock(&arg->lock);
+        if (arg->quit) {
+            pthread_mutex_unlock(&arg->lock);
+            break;
+        }
+        pthread_mutex_unlock(&arg->lock);
+
+        inform(type);
     }
     
     pthread_exit(NULL);

@@ -25,7 +25,8 @@ void* get_forced_parameter_values_start(void);
 bool get_forced_parameter_values_next(void *handler, const char** path, const char** value);
 void get_forced_parameter_values_end(void *handler);
 
-void get_parameter_values_string(const char* path, char* output, size_t max_length);
+const char *get_parameter_values_string(void **handler_pv, const char *path);
+void close_get_parameter_values(void **handler_pv);
 
 void set_parameter_values_string(const char* path, const char* value);
 void set_parameter_values_int(const char* path, int32_t value);
