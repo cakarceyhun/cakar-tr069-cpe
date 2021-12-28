@@ -115,6 +115,7 @@ void inform(enum inform_type_e type)
         enum XmlParserState xml_state = XML_STATE_VALID;
         void* xml_parser = parse_xml_init();
         int inform_response_id = parse_xml_register(&xml_parser, "/soap-env:Envelope/soap-env:Body/cwmp:InformResponse");
+        parse_xml_register(&xml_parser, "/soap-env:Envelope/soap-env:Body/cwmp:GetParameterNames/ParameterPath");
         for (j = 0; j < parser.content_length; ++j) {
             char value[1];
 
@@ -132,6 +133,15 @@ void inform(enum inform_type_e type)
 
         if (parse_xml_result_exists(&xml_parser, inform_response_id)) {
             mode = MODE_EMPTY;
+        } else {
+            struct XmlParserResult *result;
+
+            result = parse_xml_get_results(&xml_parser);
+            while (result) {
+                printf("result path=%s, value=%s\n", result->path, result->value);
+
+                result = result->next;
+            }
         }
 
         parse_xml_close(&xml_parser);

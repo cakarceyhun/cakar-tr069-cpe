@@ -251,10 +251,10 @@ bool get_forced_parameter_values_next(void *handler_vp, const char** path, const
     pthread_mutex_lock(&db_lock);
     
     if (sqlite3_step(handler->stmt) != SQLITE_ROW) {
+        pthread_mutex_unlock(&db_lock); 
         get_forced_parameter_values_end(handler_vp);
 
-        ret = false;
-        goto end;
+        return false;
     }
 
     *path = (const char *) sqlite3_column_text(handler->stmt, 0);

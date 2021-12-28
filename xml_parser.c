@@ -11,13 +11,18 @@ enum state_e {
     UNTAG
 };
 
-struct XmlParserResult
+struct XmlParserSearchItem
 {
     int id;
     const char *path;
-    char *value;
     bool found;
-    struct XmlParserResult *next;
+    struct XmlParserSearchItem *next;
+};
+
+struct XmlParserSearchItems
+{
+    struct XmlParserSearchItem *first;
+    struct XmlParserSearchItem *end;
 };
 
 struct XmlParserResults
@@ -25,6 +30,7 @@ struct XmlParserResults
     struct XmlParserResult *first;
     struct XmlParserResult *end;
 };
+
 
 struct XmlParser
 {
@@ -36,6 +42,7 @@ struct XmlParser
     size_t value_length;
     char previous;
     enum state_e state;
+    struct XmlParserSearchItems search_items;
     struct XmlParserResults results;
 };
 
@@ -53,7 +60,9 @@ void* parse_xml_init(void)
     parser->state = OUTSIDE_OF_TAG;
     parser->results.first = NULL;
     parser->results.end = NULL;
-
+    parser->search_items.first = NULL;
+    parser->search_items.end = NULL;
+    
     return (void *) parser;
 }
 
@@ -61,59 +70,79 @@ int parse_xml_register(void* parser_vp, const char *path)
 {
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
 
-    struct XmlParserResult *item = calloc(1, sizeof(struct XmlParserResult));
+    struct XmlParserSearchItem *item = calloc(1, sizeof(struct XmlParserSearchItem));
     if (!item) {
-	printf("SHOULD NOT BE HERE\n");
-	exit(1);
+        printf("SHOULD NOT BE HERE\n");
+        exit(1);
     }
 
     item->path = path;
 
-    if (!parser->results.end) {
-	item->id = 0;
+    if (!parser->search_items.end) {
+        item->id = 0;
 
-	parser->results.first = item;
-	parser->results.end = item;
+        parser->search_items.first = item;
+        parser->search_items.end = item;
     } else {
-	item->id = parser->results.end->id + 1;
+        item->id = parser->search_items.end->id + 1;
 
-	parser->results.end->next = item;
-	parser->results.end = parser->results.end->next;
+        parser->search_items.end->next = item;
+        parser->search_items.end = parser->search_items.end->next;
     }
 
-    return item->id; 
+    return item->id;
+}
+
+struct XmlParserResult *parse_xml_get_results(void* parser_vp)
+{
+    struct XmlParser* parser = *((struct XmlParser**) parser_vp);
+
+    return parser->results.first;
 }
 
 static void parse_xml_execute(void* parser_vp, const char *path, const char *value)
 {
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
-    struct XmlParserResult *item = parser->results.first;
+    struct XmlParserSearchItem *item = parser->search_items.first;
 
     while (item) {
-	if (strcmp(path, item->path) == 0) {
-	    item->value = strdup(value);
-	    item->found = true;
-	}
+        if (strcmp(path, item->path) == 0) {
+            struct XmlParserResult *result;
 
-	item = item->next;
+            result = calloc(1, sizeof(struct XmlParserResult));
+            result->value = strdup(value);
+            result->path = item->path;
+            result->id = item->id;
+            
+            if (!parser->results.end) {
+                parser->results.first = result;
+                parser->results.end = result;
+            } else {
+                parser->results.end->next = result;
+                parser->results.end = parser->results.end->next;
+            }
+
+            item->found = true;
+        }
+
+        item = item->next;
     }
 }
 
 bool parse_xml_result_exists(void* parser_vp, int id)
 {
-    int i;
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
-    struct XmlParserResult *item = parser->results.first;
+    struct XmlParserResult *result = parser->results.first;
     
-    for (i = 0; i != id && item; i++) {
-	item = item->next;
+    while (result) {
+        if (result->id == id) {
+            return true;
+        }
+        
+        result = result->next;
     }
 
-    if (item) {
-	return true;
-    } else {
-	return false;
-    }
+    return false;
 }
 
 enum XmlParserState parse_xml_push(void* parser_vp, char v)
@@ -215,19 +244,27 @@ void parse_xml_close(void* parser_vp)
     struct XmlParser* parser = *((struct XmlParser**) parser_vp);
 
     if (parser) {
-	struct XmlParserResult *item = parser->results.first;
-	while (item) {
-	    struct XmlParserResult *next = item->next;
+        struct XmlParserSearchItem *item = parser->search_items.first;
+        while (item) {
+            struct XmlParserSearchItem *next = item->next;
 
-	    if (item->value) {
-		free(item->value);
-	    }
-	    free(item);
-	    item = next;
-	}
+            free(item);
+            item = next;
+        }
 
-	free(parser);
+        struct XmlParserResult *result = parser->results.first;
+        while (result) {
+            struct XmlParserResult *next = result->next;
 
-	*((struct XmlParser**) parser_vp) = NULL;
+            if (result->value) {
+                free(result->value);
+            }
+            free(result);
+            result = next;
+        }
+
+        free(parser);
+
+        *((struct XmlParser**) parser_vp) = NULL;
     }
 }
